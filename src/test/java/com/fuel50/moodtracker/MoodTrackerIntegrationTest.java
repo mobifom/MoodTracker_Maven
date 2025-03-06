@@ -53,17 +53,34 @@ public class MoodTrackerIntegrationTest {
 
     @Test
     void testSubmitAndRetrieveMood() throws Exception {
-        // 1. Submit a mood
-        MoodSubmissionDTO moodSubmission = new MoodSubmissionDTO(MoodType.HAPPY, null, "Integration test comment");
+    	 // 1. Submit a mood
+        MoodSubmissionDTO moodSubmission = MoodSubmissionDTO.newBuilder()
+                .setMood(MoodType.HAPPY)
+                .setComment("Integration test comment")
+                .createMoodSubmissionDTO();
         
-        // Submit mood with generated cookie
+        // Convert to JSON and print for debugging
+        String requestJson = objectMapper.writeValueAsString(moodSubmission);
+        System.out.println("Request JSON: " + requestJson);
+        
+        // Perform the request but DON'T expect any status yet
         MvcResult submitResult = mockMvc.perform(post("/api/mood")
                 .contentType(MediaType.APPLICATION_JSON)
-                .content(objectMapper.writeValueAsString(moodSubmission)))
-                .andExpect(status().isCreated())
+                .content(requestJson))
                 .andReturn();
         
-        // Extract cookie from response
+        // Get the actual response status and body
+        int status = submitResult.getResponse().getStatus();
+        String responseBody = submitResult.getResponse().getContentAsString();
+        
+        // Print debug information
+        System.out.println("Response Status: " + status);
+        System.out.println("Response Body: " + responseBody);
+        
+        // Now assert the status
+        assertEquals(201, status, "Expected status 201 but got " + status + " with body: " + responseBody);
+        
+        // Continue with the rest of the test only if we got the expected status
         Cookie userIdCookie = submitResult.getResponse().getCookie("user_id");
         assertNotNull(userIdCookie, "User ID cookie should be set");
         
@@ -87,13 +104,25 @@ public class MoodTrackerIntegrationTest {
 
     @Test
     void testDuplicateSubmission() throws Exception {
-        // 1. Set up a user with a cookie
-        MoodSubmissionDTO firstMood = new MoodSubmissionDTO(MoodType.HAPPY, null, "First submission");
+    	// 1. Set up a user with a cookie
+        MoodSubmissionDTO firstMood = MoodSubmissionDTO.newBuilder()
+                .setMood(MoodType.HAPPY)
+                .setComment("First submission")
+                .createMoodSubmissionDTO();
+        
+        String requestJson = objectMapper.writeValueAsString(firstMood);
+        System.out.println("First request JSON: " + requestJson);
         
         // Submit first mood and get cookie
         MvcResult result = mockMvc.perform(post("/api/mood")
                 .contentType(MediaType.APPLICATION_JSON)
-                .content(objectMapper.writeValueAsString(firstMood)))
+                .content(requestJson))
+                .andDo(r -> {
+                    if (r.getResponse().getStatus() != 201) {
+                        System.out.println("Response status: " + r.getResponse().getStatus());
+                        System.out.println("Response body: " + r.getResponse().getContentAsString());
+                    }
+                })
                 .andExpect(status().isCreated())
                 .andReturn();
         
@@ -118,13 +147,26 @@ public class MoodTrackerIntegrationTest {
     @Test
     void testMultipleUsersMoodAggregation() throws Exception {
         // 1. Submit mood from user 1
-        MoodSubmissionDTO user1Mood = new MoodSubmissionDTO(MoodType.HAPPY, null, "User 1 comment");
+        MoodSubmissionDTO user1Mood = MoodSubmissionDTO.newBuilder()
+            .setMood(MoodType.HAPPY)
+            .setComment("User 1 comment")
+            .createMoodSubmissionDTO();
+
+        String requestJson1 = objectMapper.writeValueAsString(user1Mood);
+        System.out.println("User 1 request JSON: " + requestJson1);
+
         mockMvc.perform(post("/api/mood")
                 .contentType(MediaType.APPLICATION_JSON)
-                .content(objectMapper.writeValueAsString(user1Mood)))
+                .content(requestJson1))
+                .andDo(r -> {
+                    if (r.getResponse().getStatus() != 201) {
+                        System.out.println("Response status: " + r.getResponse().getStatus());
+                        System.out.println("Response body: " + r.getResponse().getContentAsString());
+                    }
+                })
                 .andExpect(status().isCreated());
-        
-        // 2. Submit mood from user 2
+
+        // 2. Submit mood from user 2 (Adding the missing user 2)
         MoodSubmissionDTO user2Mood = new MoodSubmissionDTO(MoodType.GRUMPY, null, "User 2 comment");
         mockMvc.perform(post("/api/mood")
                 .contentType(MediaType.APPLICATION_JSON)
@@ -139,19 +181,19 @@ public class MoodTrackerIntegrationTest {
                 .cookie(new Cookie("user_id", UUID.randomUUID().toString())) // Different user
                 .content(objectMapper.writeValueAsString(user3Mood)))
                 .andExpect(status().isCreated());
-        
+
         // 4. Retrieve team mood
         MvcResult getResult = mockMvc.perform(get("/api/mood/overall"))
                 .andExpect(status().isOk())
                 .andReturn();
-        
+
         TeamMoodDTO teamMood = objectMapper.readValue(getResult.getResponse().getContentAsString(), TeamMoodDTO.class);
-        
+
         // With scores of 5 (HAPPY), 2 (GRUMPY), and 4 (JUST_NORMAL_REALLY)
         // Average = (5 + 2 + 4) / 3 = 3.67, which maps to JUST_NORMAL_REALLY
-        assertEquals(MoodType.JUST_NORMAL_REALLY, teamMood.getOverallMood(), 
+        assertEquals(MoodType.JUST_NORMAL_REALLY, teamMood.getOverallMood(),
                 "Overall mood should be JUST_NORMAL_REALLY based on average score");
-        
+
         assertEquals(3, teamMood.getComments().size(), "All 3 comments should be included");
         assertTrue(teamMood.getComments().contains("User 1 comment"));
         assertTrue(teamMood.getComments().contains("User 2 comment"));

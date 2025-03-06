@@ -69,15 +69,19 @@ public class MoodControllerTest {
     @Test
     void testSubmitMood_WithExistingCookie() throws Exception {
         // Arrange
-        MoodSubmissionDTO moodSubmission = new MoodSubmissionDTO(MoodType.HAPPY, null, "Test comment");
+        MoodSubmissionDTO moodSubmission = MoodSubmissionDTO.newBuilder()
+                .setMood(MoodType.HAPPY)
+                .setComment("Test comment")
+                .createMoodSubmissionDTO();
+                
         doNothing().when(moodService).submitMood(any(MoodSubmissionDO.class));
         String userId = "test-user-id";
 
-        // Act & Assert
+        // Act & Assert - FIXING THIS PART
         mockMvc.perform(post("/api/mood")
                 .contentType(MediaType.APPLICATION_JSON)
                 .content(objectMapper.writeValueAsString(moodSubmission))
-                .cookie(new javax.servlet.http.Cookie("user_id", userId)))
+                .cookie(new jakarta.servlet.http.Cookie("user_id", userId)))  // Changed from javax to jakarta
                 .andExpect(status().isCreated());
 
         verify(moodService).submitMood(any(MoodSubmissionDO.class));

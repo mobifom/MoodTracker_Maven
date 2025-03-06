@@ -32,6 +32,8 @@ public class DefaultMoodService implements MoodService {
         LocalDate today = LocalDate.now();
         LocalDateTime startOfDay = today.atStartOfDay(); // 12:00 AM
         LocalDateTime endOfDay = today.atTime(23, 59, 59); // 11:59:59 PM
+        LOG.debug("+++++++++++++++++++ user : {}", moodSubmission.getUserId());
+
         if (moodRepository.existsByUserIdAndSubmissionDateBetween(moodSubmission.getUserId(), startOfDay, endOfDay)) {
             LOG.error("Duplicate mood submission for this user : {}", moodSubmission.getUserId());
             throw new DuplicateMoodSubmissionException("Sorry, you have already submitted your response for today, try again tomorrow!");

@@ -5,6 +5,7 @@ import com.fasterxml.jackson.annotation.JsonInclude;
 import com.fuel50.moodtracker.domainvalue.MoodType;
 import jakarta.validation.constraints.Max;
 import jakarta.validation.constraints.NotNull;
+import jakarta.validation.constraints.Size;
 
 @JsonInclude(JsonInclude.Include.NON_NULL)
 public class MoodSubmissionDTO {
@@ -15,7 +16,7 @@ public class MoodSubmissionDTO {
     private String userId;
 
     // max length of 350 characters
-    @Max(value = 350, message = "Comment can not be longer than 350 characters!")
+    @Size(max = 350, message = "Comment can not be longer than 350 characters!")
     private String comment;
 
     private MoodSubmissionDTO() {
